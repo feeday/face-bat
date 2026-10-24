@@ -19,23 +19,44 @@ PAGE = '''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="vi
 
 def download_models():
     MODELS.mkdir(exist_ok=True)
+    # Explicit empty ProxyHandler bypasses environment AND Windows proxy settings.
+    routes = [('direct', urllib.request.build_opener(urllib.request.ProxyHandler({}))),
+              ('system', urllib.request.build_opener())]
     for name, minimum in [('face_detection_yunet_2023mar.onnx', 200000), ('face_recognition_sface_2021dec.onnx', 30000000)]:
         target = MODELS / name
         if target.exists() and target.stat().st_size >= minimum:
             continue
         folder = 'face_detection_yunet' if 'yunet' in name else 'face_recognition_sface'
-        url = f'https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/{folder}/{name}'
-        print(f'Downloading {name} ...', flush=True)
+        urls = [
+            f'https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/{folder}/{name}',
+            f'https://hf-mirror.com/opencv/{folder}/resolve/main/{name}',
+            f'https://huggingface.co/opencv/{folder}/resolve/main/{name}',
+        ]
         temp = target.with_suffix('.part')
-        try:
-            with urllib.request.urlopen(url, timeout=120) as src, temp.open('wb') as dst:
-                while chunk := src.read(1024 * 1024):
-                    dst.write(chunk)
-            if temp.stat().st_size < minimum:
-                raise RuntimeError('下载内容不完整，请检查网络，或按 README 手动下载模型。')
-            os.replace(temp, target)
-        finally:
-            temp.unlink(missing_ok=True)
+        errors = []
+        downloaded = False
+        for route_name, opener in routes:
+            for url in urls:
+                print(f'Downloading {name} [{route_name}] {url}', flush=True)
+                try:
+                    with opener.open(url, timeout=25) as src, temp.open('wb') as dst:
+                        while chunk := src.read(1024 * 1024):
+                            dst.write(chunk)
+                    if temp.stat().st_size < minimum:
+                        raise RuntimeError('Downloaded file is incomplete or is not an ONNX model.')
+                    os.replace(temp, target)
+                    downloaded = True
+                    break
+                except Exception as exc:
+                    errors.append(f'{route_name} {url}: {exc}')
+                    print(f'Download failed: {exc}', flush=True)
+                finally:
+                    temp.unlink(missing_ok=True)
+            if downloaded:
+                break
+        if not downloaded:
+            raise RuntimeError(f'All download routes failed for {name}. '
+                               f'Place the model manually in {MODELS}.\n' + '\n'.join(errors))
 
 def data_url(bgr):
     ok, buf = cv2.imencode('.jpg', bgr)
