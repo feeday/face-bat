@@ -9,3 +9,9 @@
 - 单张图片最多 6 MB；多人照片自动选最大人脸。
 
 对比和验证范围见仓库根目录 COMPARISON.md。
+
+## Python 3.14t 安装修复
+
+运行日志显示自动选中了 Python 3.14 自由线程版（cp314t），OpenCV 因无匹配 wheel 而源码编译失败。当前 start.bat 只接受普通 CPython 3.11/3.12 64 位，并使用 --only-binary=:all:，不再尝试本地编译。
+
+请先安装普通 Python 3.11 或 3.12 64 位，再双击 start.bat。新环境为 .venv-kimi，旧 .venv 保留不动。新启动脚本仍包含程序载荷，可单文件替换使用。此修复未进行 Windows 实机验证。

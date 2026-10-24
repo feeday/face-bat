@@ -15,32 +15,39 @@ echo [1/4] 正在释放程序文件……
 powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$c=Get-Content -LiteralPath $env:SELF; $m=[Array]::IndexOf($c,'__PAYLOAD__'); if($m -lt 0){exit 2}; $b=($c[($m+1)..($c.Length-1)] -join ''); $z=Join-Path $env:ROOT '.face_payload.zip'; try {[IO.File]::WriteAllBytes($z,[Convert]::FromBase64String($b)); Expand-Archive -LiteralPath $z -DestinationPath $env:ROOT -Force} finally {Remove-Item -LiteralPath $z -Force -ErrorAction SilentlyContinue}"
 if errorlevel 1 goto fail
 
+rem Require standard CPython 3.11/3.12 x64, never free-threaded Python.
 set "PY="
-where py >nul 2>nul
-if not errorlevel 1 (
-    py -3 -c "import sys;raise SystemExit(0 if sys.version_info>= (3,10) else 1)" >nul 2>nul
-    if not errorlevel 1 set "PY=py -3"
-)
-if not defined PY (
-    where python >nul 2>nul
-    if not errorlevel 1 (
-        python -c "import sys;raise SystemExit(0 if sys.version_info>= (3,10) else 1)" >nul 2>nul
-        if not errorlevel 1 set "PY=python"
+set "PY_CHECK=import sys,sysconfig;raise SystemExit(0 if sys.version_info[:2] in [(3,11),(3,12)] and sys.maxsize > 2**32 and not sysconfig.get_config_var('Py_GIL_DISABLED') else 1)"
+for %%V in (3.11 3.12) do (
+    if not defined PY (
+        py -%%V -c "%PY_CHECK%" >nul 2>nul
+        if not errorlevel 1 set "PY=py -%%V"
     )
 )
 if not defined PY (
-    echo 未找到 Python 3.10 或更高版本。
-    echo 请先安装 Python，并在安装时勾选 Add Python to PATH。
-    echo 官方下载：https://www.python.org/downloads/windows/
+    python -c "%PY_CHECK%" >nul 2>nul
+    if not errorlevel 1 set "PY=python"
+)
+if not defined PY (
+    echo Please install standard Python 3.11 or 3.12 64-bit, then retry.
+    echo Python 3.14 free-threaded is not supported by this launcher.
+    echo https://www.python.org/downloads/windows/
     goto fail
 )
 
-echo [2/4] 正在创建独立虚拟环境 .venv……
-if not exist ".venv\Scripts\python.exe" (
-    %PY% -m venv .venv
+echo [2/4] Checking isolated environment .venv-kimi……
+set "VENV_PY=%ROOT%\.venv-kimi\Scripts\python.exe"
+if exist "%VENV_PY%" (
+    "%VENV_PY%" -c "%PY_CHECK%" >nul 2>nul
+    if errorlevel 1 (
+        echo Existing .venv-kimi is incompatible. Rename it and retry.
+        goto fail
+    )
+) else (
+    %PY% -m venv .venv-kimi
     if errorlevel 1 goto fail
 )
-set "VENV_PY=%ROOT%\.venv\Scripts\python.exe"
+"%VENV_PY%" -c "import sys;print('Python:',sys.version)"
 
 echo [3/4] 正在检查并安装依赖……
 rem Only dependency installation bypasses proxy; system settings stay untouched.
@@ -53,10 +60,10 @@ set "NO_PROXY=*"
 set "PIP_CONFIG_FILE=NUL"
 set "PIP_INDEX_URL="
 set "PIP_EXTRA_INDEX_URL="
-"%VENV_PY%" -m pip install --disable-pip-version-check --index-url https://pypi.tuna.tsinghua.edu.cn/simple --timeout 20 --retries 1 -r requirements.txt
+"%VENV_PY%" -m pip install --only-binary=:all: --disable-pip-version-check --index-url https://pypi.tuna.tsinghua.edu.cn/simple --timeout 20 --retries 1 -r requirements.txt
 if not errorlevel 1 goto deps_ok
-echo 清华镜像连接失败，正在尝试官方 PyPI……
-"%VENV_PY%" -m pip install --disable-pip-version-check --index-url https://pypi.org/simple --timeout 20 --retries 1 -r requirements.txt
+echo 清华源安装未成功，正在尝试官方 PyPI……
+"%VENV_PY%" -m pip install --only-binary=:all: --disable-pip-version-check --index-url https://pypi.org/simple --timeout 20 --retries 1 -r requirements.txt
 if errorlevel 1 (
     endlocal
     goto fail
