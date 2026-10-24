@@ -26,8 +26,26 @@ if not exist ".venv\Scripts\python.exe" goto fail
 :install
 if exist ".venv\installed-v1.ok" goto run
 echo Installing packages into isolated .venv ...
-".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -r requirements.txt
-if errorlevel 1 goto fail
+rem Scope proxy bypass to pip installation only; preserve system settings.
+setlocal
+set "HTTP_PROXY="
+set "HTTPS_PROXY="
+set "ALL_PROXY="
+set "PIP_PROXY="
+set "NO_PROXY=*"
+set "PIP_CONFIG_FILE=NUL"
+set "PIP_INDEX_URL="
+set "PIP_EXTRA_INDEX_URL="
+".venv\Scripts\python.exe" -m pip install --only-binary=:all: --disable-pip-version-check --index-url https://pypi.tuna.tsinghua.edu.cn/simple --timeout 20 --retries 1 -r requirements.txt
+if not errorlevel 1 goto deps_ok
+echo Installation failed. Trying official PyPI ...
+".venv\Scripts\python.exe" -m pip install --only-binary=:all: --disable-pip-version-check --index-url https://pypi.org/simple --timeout 20 --retries 1 -r requirements.txt
+if errorlevel 1 (
+    endlocal
+    goto fail
+)
+:deps_ok
+endlocal
 ".venv\Scripts\python.exe" -c "import flask, waitress, cv2, numpy, PIL"
 if errorlevel 1 goto fail
 type nul > ".venv\installed-v1.ok"
