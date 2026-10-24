@@ -2,16 +2,16 @@
 setlocal EnableExtensions
 chcp 65001 >nul
 cd /d "%~dp0"
-title 人脸相似度对比 - 本地一键启动
+title Face Compare - Local Launcher
 set "SELF=%~f0"
 set "ROOT=%CD%"
 
 echo ============================================================
-echo                 人脸相似度对比 · 一键启动
+echo                 Face Compare - Local Launcher
 echo ============================================================
 echo.
 
-echo [1/4] 正在释放程序文件……
+echo [1/4] Extracting application files ...
 powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$c=Get-Content -LiteralPath $env:SELF; $m=[Array]::IndexOf($c,'__PAYLOAD__'); if($m -lt 0){exit 2}; $b=($c[($m+1)..($c.Length-1)] -join ''); $z=Join-Path $env:ROOT '.face_payload.zip'; try {[IO.File]::WriteAllBytes($z,[Convert]::FromBase64String($b)); Expand-Archive -LiteralPath $z -DestinationPath $env:ROOT -Force} finally {Remove-Item -LiteralPath $z -Force -ErrorAction SilentlyContinue}"
 if errorlevel 1 goto fail
 
@@ -35,7 +35,7 @@ if not defined PY (
     goto fail
 )
 
-echo [2/4] Checking isolated environment .venv-kimi……
+echo [2/4] Checking isolated environment .venv-kimi ...
 set "VENV_PY=%ROOT%\.venv-kimi\Scripts\python.exe"
 if exist "%VENV_PY%" (
     "%VENV_PY%" -c "%PY_CHECK%" >nul 2>nul
@@ -49,9 +49,8 @@ if exist "%VENV_PY%" (
 )
 "%VENV_PY%" -c "import sys;print('Python:',sys.version)"
 
-echo [3/4] 正在检查并安装依赖……
-rem Only dependency installation bypasses proxy; system settings stay untouched.
-setlocal
+echo [3/4] Checking and installing dependencies ...
+rem Bypass inherited proxies for installation AND model downloads in this process.
 set "HTTP_PROXY="
 set "HTTPS_PROXY="
 set "ALL_PROXY="
@@ -62,17 +61,16 @@ set "PIP_INDEX_URL="
 set "PIP_EXTRA_INDEX_URL="
 "%VENV_PY%" -m pip install --only-binary=:all: --disable-pip-version-check --index-url https://pypi.tuna.tsinghua.edu.cn/simple --timeout 20 --retries 1 -r requirements.txt
 if not errorlevel 1 goto deps_ok
-echo 清华源安装未成功，正在尝试官方 PyPI……
+echo Installation failed. Trying official PyPI ...
 "%VENV_PY%" -m pip install --only-binary=:all: --disable-pip-version-check --index-url https://pypi.org/simple --timeout 20 --retries 1 -r requirements.txt
 if errorlevel 1 (
-    endlocal
     goto fail
 )
 :deps_ok
-endlocal
+rem Proxy bypass remains active until the launcher exits.
 
-echo [4/4] 正在启动本地网页……
-echo 首次启动需下载人脸模型，请保持网络连接。
+echo [4/4] Starting local web app ...
+echo First launch downloads face models. Please keep Internet connected.
 echo.
 "%VENV_PY%" app.py
 if errorlevel 1 goto fail
@@ -81,7 +79,7 @@ goto end
 :fail
 echo.
 echo ------------------------------------------------------------
-echo 启动未完成。请查看上方错误信息，修复后重新双击本文件。
+echo Startup failed. Read the error above, fix it and retry.
 echo ------------------------------------------------------------
 pause
 exit /b 1
