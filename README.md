@@ -1,29 +1,18 @@
-Windows 人脸相似度对比
+# 人脸相似度对比：GPT 与 Kimi 两版本
 
-1. 安装 Python 3.11 64位（推荐），勾选 Add Python to PATH。
-2. 解压整个文件夹，双击 start.bat；不要在压缩包内直接运行。
-3. 首次自动在本文件夹创建 .venv，安装依赖并下载约 39 MB 模型。
-4. 浏览器自动打开 http://127.0.0.1:7860，选择两张照片，点击开始对比。
-5. 之后双击 start.bat 即可；关闭命令行窗口停止。
+两套独立实现，作者归属由用户确认。两者使用 OpenCV YuNet 检测与 SFace 特征匹配，不是两种不同的人脸识别模型。
 
-不需要显卡、CUDA、API Key。支持 Python 3.10—3.12 64位。
-照片只在本机内存处理，程序不保存上传照片，不启用公网分享。
-端口被占用时，关闭之前的程序后重试。
-如果 pip 下载失败，可配置你信任的 pip 镜像后重试。
-若模型下载失败，可手动把以下文件保存到 models 子文件夹，再运行：
-https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
-https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx
-请下载实际 ONNX 二进制文件，不要保存 Git LFS 指针文本或网页。
+| 目录 | 来源 | Windows 入口 |
+| --- | --- | --- |
+| [gpt-6.1-sol](gpt-6.1-sol/) | 仓库原有版本 | `gpt-6.1-sol/start.bat` |
+| [kimi-3.1-pro](kimi-3.1-pro/) | 用户本次附件 | `kimi-3.1-pro/start.bat` |
 
-检测：YuNet；特征匹配：SFace；相似度为原始余弦值，越高越相似。
-默认 0.363 是 OpenCV 在 LFW 上的参考阈值，并非适用于所有数据。
-相似度不是同一人概率，也不代表生成图片的整体质量。
-多人照片必须先裁剪，界面展示实际参与匹配的对齐人脸。
+[代码与 UI 对比](COMPARISON.md)
 
-官方说明与模型许可：
-https://docs.opencv.org/4.x/d0/dd4/tutorial_dnn_face.html
-https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet
-https://github.com/opencv/opencv_zoo/tree/main/models/face_recognition_sface
-如用于商业交付，请查看以上模型目录的许可证与使用说明。
+根目录 app.py、requirements.txt、start.bat 保留原有 GPT 版本，兼容已有使用方式。推荐进入对应目录启动，虚拟环境与模型缓存各自独立。
 
-验证范围：交付前完成 Python 语法和网页模板检查；当前环境无法运行 Windows BAT、下载模型实测。
+GPT 版启动后自动分配空闲端口，以终端实际输出为准；其目录内原始 README 曾写固定 7860，已经过时。Kimi 默认 5000。
+
+Kimi 同时保留原始 BAT 与后续代理修复 BAT，详见其 README。此次整理未合并两套推理代码，也未把修复后的启动脚本算作原模型能力。
+
+首次运行需要联网安装依赖、下载模型；之后照片在本机处理。识别分数不是同一人概率。验证范围与已知缺陷见对比文档。

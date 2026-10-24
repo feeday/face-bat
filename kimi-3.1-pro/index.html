@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="在本地选择两张人脸照片，计算人脸特征相似度。图片不会上传到第三方服务。">
+<title>对照 · 人脸相似度对比</title>
+<style>
+:root{
+  --p-ink:oklch(0.18 0 0);--p-paper:oklch(0.995 0 0);--p-muted:oklch(0.48 0 0);--p-line:oklch(0.86 0 0);
+  --surface:var(--p-paper);--surface-subtle:oklch(0.97 0 0);--text:var(--p-ink);--text-muted:var(--p-muted);
+  --border:var(--p-line);--button:var(--p-ink);--button-text:var(--p-paper);--focus:var(--p-ink);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:light;scroll-behavior:smooth}
+body{min-height:100dvh;background:var(--surface);color:var(--text);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif;-webkit-font-smoothing:antialiased}
+button,input{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.38}
+:focus-visible{outline:2px solid var(--focus);outline-offset:4px}
+::selection{background:var(--p-ink);color:var(--p-paper)}
+.topbar{height:72px;border-bottom:1px solid var(--text);display:flex;align-items:center;justify-content:space-between;padding:0 32px;gap:16px}
+.brand{display:flex;align-items:center;gap:12px;font-weight:650;letter-spacing:.08em}
+.brand svg{width:24px;height:24px;flex:none}
+.local-status{font-size:12px;letter-spacing:.08em;display:flex;align-items:center;gap:8px;color:var(--text-muted)}
+.local-status::before{content:"";width:7px;height:7px;background:var(--text);border-radius:50%}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;min-height:calc(100dvh - 73px)}
+.workspace{padding:36px 40px 48px;min-width:0}
+.intro{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;margin-bottom:32px}
+h1{font-size:clamp(28px,3.2vw,48px);line-height:1.15;font-weight:560;letter-spacing:-.045em}
+.intro p{max-width:32ch;text-align:right;color:var(--text-muted);font-size:14px}
+.compare-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid var(--text);border-bottom:1px solid var(--text)}
+.upload-section{padding:24px 24px 28px 0;min-width:0}
+.upload-section+.upload-section{border-left:1px solid var(--text);padding-left:24px;padding-right:0}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:16px}
+.section-head h2{font-size:13px;font-weight:650;letter-spacing:.12em;text-transform:uppercase}
+.section-head span{font-size:12px;color:var(--text-muted)}
+.dropzone{position:relative;width:100%;aspect-ratio:4/3;border:1px solid var(--border);background:var(--surface-subtle);display:flex;align-items:center;justify-content:center;overflow:hidden;transition:background-color .18s ease,border-color .18s ease}
+.dropzone:hover,.dropzone.dragging{border-color:var(--text);background:oklch(0.94 0 0)}
+.dropzone.has-image{background:oklch(0.93 0 0)}
+.dropzone input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.empty-picker{border:0;background:transparent;color:var(--text);width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px}
+.empty-picker svg{width:40px;height:40px;stroke-width:1.25}
+.picker-title{font-size:16px;font-weight:560}
+.picker-hint{font-size:12px;color:var(--text-muted);letter-spacing:.04em}
+.preview{width:100%;height:100%;object-fit:contain;display:none}
+.has-image .preview{display:block}.has-image .empty-picker{display:none}
+.file-meta{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:12px;min-height:44px}
+.file-name{font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.text-button{border:0;background:transparent;color:var(--text);font-size:12px;text-decoration:underline;text-underline-offset:4px;min-height:32px;padding:0 2px;flex:none}
+.text-button:hover{text-decoration-thickness:2px}
+.text-button[hidden]{display:none}
+.process-note{display:flex;gap:12px;align-items:flex-start;margin-top:24px;color:var(--text-muted);font-size:13px;max-width:70ch}
+.process-note svg{width:18px;height:18px;flex:none;margin-top:3px}
+.sidebar{border-left:1px solid var(--text);padding:36px 28px;background:var(--surface)}
+.sidebar-inner{position:sticky;top:32px}
+.sidebar h2{font-size:12px;text-transform:uppercase;letter-spacing:.14em;font-weight:650;margin-bottom:28px}
+.result-block{border-top:1px solid var(--text);border-bottom:1px solid var(--text);padding:24px 0;margin-bottom:24px}
+.result-label{font-size:13px;color:var(--text-muted)}
+.score-line{display:flex;align-items:baseline;gap:6px;margin:8px 0 16px}
+.score{font-size:64px;line-height:1;font-weight:500;letter-spacing:-.06em;font-variant-numeric:tabular-nums}
+.percent{font-size:20px}
+.meter{height:2px;background:var(--border);overflow:hidden;margin-bottom:16px}
+.meter-fill{height:100%;width:0;background:var(--text);transform-origin:left;transition:width .25s ease}
+.verdict{font-size:15px;font-weight:600;min-height:25px}
+.cosine{font-size:12px;color:var(--text-muted);margin-top:4px;font-variant-numeric:tabular-nums}
+.primary-button{width:100%;min-height:48px;border:1px solid var(--button);background:var(--button);color:var(--button-text);font-weight:600;letter-spacing:.04em;transition:background-color .18s ease,color .18s ease}
+.primary-button:hover:not(:disabled){background:var(--surface);color:var(--text)}
+.secondary-button{width:100%;min-height:44px;border:0;border-bottom:1px solid var(--text);background:transparent;color:var(--text);margin-top:8px;font-size:13px}
+.secondary-button:hover:not(:disabled){background:var(--surface-subtle)}
+.message{font-size:13px;line-height:1.55;margin-top:16px;min-height:20px;overflow-wrap:anywhere}
+.message.error{font-weight:600}
+.details{margin-top:28px;border-top:1px solid var(--border)}
+details{border-bottom:1px solid var(--border);padding:14px 0}
+summary{cursor:pointer;font-size:13px;font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center;min-height:28px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-size:18px;font-weight:400}details[open] summary::after{content:"−"}
+details p,details li{font-size:12px;color:var(--text-muted);line-height:1.75;margin-top:10px}
+details ul{padding-left:18px}
+.detection{font-size:12px;color:var(--text-muted);margin-top:12px;line-height:1.8}
+.footer{padding:18px 32px;border-top:1px solid var(--text);font-size:11px;letter-spacing:.04em;color:var(--text-muted);display:flex;justify-content:space-between;gap:16px}
+@media(max-width:900px){.layout{grid-template-columns:minmax(0,1fr) 260px}.workspace{padding:28px 24px}.sidebar{padding:28px 22px}.intro{display:block}.intro p{text-align:left;margin-top:12px}.compare-grid{grid-template-columns:1fr}.upload-section{padding:24px 0}.upload-section+.upload-section{border-left:0;border-top:1px solid var(--text);padding-left:0}.dropzone{aspect-ratio:16/10}}
+@media(max-width:680px){.topbar{height:64px;padding:0 18px}.brand{white-space:nowrap}.local-status{display:none}.layout{display:block;min-height:0}.workspace{padding:26px 18px}.sidebar{border-left:0;border-top:1px solid var(--text);padding:28px 18px}.sidebar-inner{position:static}.score{font-size:56px}h1{font-size:32px}.footer{padding:16px 18px;display:block}.footer span{display:block;margin-top:4px}.empty-picker{min-height:180px}.dropzone{aspect-ratio:4/3}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18c.8-2.3 2.7-3.5 5.5-3.5s4.7 1.2 5.5 3.5"/></svg>
+    对照 / FACE MATCH
+  </div>
+  <div class="local-status">本地运行 · 图片不上传云端</div>
+</header>
+<div class="layout">
+  <main class="workspace">
+    <div class="intro">
+      <h1>两张面孔，<br>一次对照。</h1>
+      <p>选择两张包含清晰人脸的照片，比较人脸特征向量的余弦相似度。</p>
+    </div>
+    <div class="compare-grid">
+      <section class="upload-section" aria-labelledby="title-a">
+        <div class="section-head"><h2 id="title-a">图片 A</h2><span>基准照片</span></div>
+        <div class="dropzone" id="drop-a">
+          <input type="file" id="file-a" accept="image/jpeg,image/png,image/webp,image/bmp" aria-label="选择图片 A">
+          <button class="empty-picker" id="pick-a" type="button" aria-label="选择或拖入图片 A">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="3" y="3" width="18" height="18"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 17 5-5 4 4 3-3 6 6"/></svg>
+            <span class="picker-title">点击选择或拖入照片</span>
+            <span class="picker-hint">JPG / PNG / WEBP / BMP · 最大 6 MB</span>
+          </button>
+          <img class="preview" id="preview-a" alt="图片 A 预览">
+        </div>
+        <div class="file-meta"><span class="file-name" id="name-a">尚未选择图片</span><button class="text-button" id="change-a" type="button" hidden>更换图片</button></div>
+      </section>
+      <section class="upload-section" aria-labelledby="title-b">
+        <div class="section-head"><h2 id="title-b">图片 B</h2><span>待对比照片</span></div>
+        <div class="dropzone" id="drop-b">
+          <input type="file" id="file-b" accept="image/jpeg,image/png,image/webp,image/bmp" aria-label="选择图片 B">
+          <button class="empty-picker" id="pick-b" type="button" aria-label="选择或拖入图片 B">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="3" y="3" width="18" height="18"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 17 5-5 4 4 3-3 6 6"/></svg>
+            <span class="picker-title">点击选择或拖入照片</span>
+            <span class="picker-hint">JPG / PNG / WEBP / BMP · 最大 6 MB</span>
+          </button>
+          <img class="preview" id="preview-b" alt="图片 B 预览">
+        </div>
+        <div class="file-meta"><span class="file-name" id="name-b">尚未选择图片</span><button class="text-button" id="change-b" type="button" hidden>更换图片</button></div>
+      </section>
+    </div>
+    <div class="process-note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="5" y="10" width="14" height="11"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      <p>照片仅在你的电脑上临时解码和计算，不保存、不上传至第三方。多人照片会自动选取画面中最大的人脸。</p>
+    </div>
+  </main>
+  <aside class="sidebar" aria-labelledby="result-title">
+    <div class="sidebar-inner">
+      <h2 id="result-title">对比结果</h2>
+      <div class="result-block" aria-live="polite">
+        <div class="result-label">人脸特征相似度</div>
+        <div class="score-line"><span class="score" id="score">—</span><span class="percent" id="percent"></span></div>
+        <div class="meter" aria-hidden="true"><div class="meter-fill" id="meter-fill"></div></div>
+        <div class="verdict" id="verdict">等待选择两张照片</div>
+        <div class="cosine" id="cosine">同一人参考阈值：余弦值 ≥ 0.363</div>
+        <div class="detection" id="detection"></div>
+      </div>
+      <button class="primary-button" id="compare" type="button" disabled>开始对比</button>
+      <button class="secondary-button" id="reset" type="button" disabled>清空并重新选择</button>
+      <div class="message" id="message" role="status"></div>
+      <div class="details">
+        <details>
+          <summary>如何理解结果</summary>
+          <p>相似度由模型余弦值换算为 0–100 的显示分数。余弦值达到 0.363 时标记为“可能是同一人”，低于该值时标记为“可能不是同一人”。分数不是身份概率。</p>
+        </details>
+        <details>
+          <summary>怎样获得更稳定的结果</summary>
+          <ul><li>使用正面、清晰、光线均匀的照片。</li><li>避免口罩、墨镜和重度美颜。</li><li>尽量让人脸占画面较大比例。</li></ul>
+        </details>
+        <details>
+          <summary>技术与隐私</summary>
+          <p>使用 OpenCV YuNet 检测人脸、SFace 提取特征。首次启动会下载模型文件，之后可离线对比。网页与计算服务均在本机运行。</p>
+        </details>
+      </div>
+    </div>
+  </aside>
+</div>
+<footer class="footer">仅供辅助比对，不适用于门禁、支付或司法身份鉴定。<span>LOCAL / OPENCV / SFACE</span></footer>
+<script>
+(() => {
+  const state = { a: null, b: null };
+  const urls = { a: null, b: null };
+  const compareButton = document.getElementById('compare');
+  const resetButton = document.getElementById('reset');
+  const message = document.getElementById('message');
+  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/bmp'];
+  let busy = false;
+
+  function setMessage(text, isError = false) {
+    message.textContent = text;
+    message.classList.toggle('error', isError);
+  }
+
+  function updateControls() {
+    compareButton.disabled = busy || !state.a || !state.b;
+    resetButton.disabled = busy || (!state.a && !state.b);
+    compareButton.textContent = busy ? '正在提取人脸特征…' : '开始对比';
+  }
+
+  function clearResult() {
+    document.getElementById('score').textContent = '—';
+    document.getElementById('percent').textContent = '';
+    document.getElementById('meter-fill').style.width = '0';
+    document.getElementById('verdict').textContent = state.a && state.b ? '可以开始对比' : '等待选择两张照片';
+    document.getElementById('cosine').textContent = '同一人参考阈值：余弦值 ≥ 0.363';
+    document.getElementById('detection').textContent = '';
+  }
+
+  function selectFile(key, file) {
+    if (!file) return;
+    if (!allowed.includes(file.type)) {
+      setMessage('仅支持 JPG、PNG、WEBP 或 BMP 图片。', true);
+      return;
+    }
+    if (file.size > 6 * 1024 * 1024) {
+      setMessage('单张图片不能超过 6 MB。', true);
+      return;
+    }
+    if (urls[key]) URL.revokeObjectURL(urls[key]);
+    state[key] = file;
+    urls[key] = URL.createObjectURL(file);
+    const preview = document.getElementById(`preview-${key}`);
+    preview.src = urls[key];
+    document.getElementById(`drop-${key}`).classList.add('has-image');
+    document.getElementById(`name-${key}`).textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+    document.getElementById(`change-${key}`).hidden = false;
+    setMessage('');
+    clearResult();
+    updateControls();
+  }
+
+  function reset(key) {
+    state[key] = null;
+    if (urls[key]) URL.revokeObjectURL(urls[key]);
+    urls[key] = null;
+    document.getElementById(`file-${key}`).value = '';
+    document.getElementById(`preview-${key}`).removeAttribute('src');
+    document.getElementById(`drop-${key}`).classList.remove('has-image');
+    document.getElementById(`name-${key}`).textContent = '尚未选择图片';
+    document.getElementById(`change-${key}`).hidden = true;
+  }
+
+  ['a', 'b'].forEach(key => {
+    const input = document.getElementById(`file-${key}`);
+    const drop = document.getElementById(`drop-${key}`);
+    document.getElementById(`pick-${key}`).addEventListener('click', () => input.click());
+    document.getElementById(`change-${key}`).addEventListener('click', () => input.click());
+    input.addEventListener('change', () => selectFile(key, input.files[0]));
+    ['dragenter', 'dragover'].forEach(type => drop.addEventListener(type, event => {
+      event.preventDefault();
+      if (!busy) drop.classList.add('dragging');
+    }));
+    ['dragleave', 'drop'].forEach(type => drop.addEventListener(type, event => {
+      event.preventDefault();
+      drop.classList.remove('dragging');
+    }));
+    drop.addEventListener('drop', event => {
+      if (!busy) selectFile(key, event.dataTransfer.files[0]);
+    });
+  });
+
+  compareButton.addEventListener('click', async () => {
+    if (!state.a || !state.b || busy) return;
+    busy = true;
+    setMessage('首次对比可能需要下载模型，请耐心等待。');
+    clearResult();
+    document.getElementById('verdict').textContent = '正在分析两张照片…';
+    updateControls();
+    const body = new FormData();
+    body.append('image_a', state.a);
+    body.append('image_b', state.b);
+    try {
+      const response = await fetch('/api/compare', { method: 'POST', body });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '对比请求失败，请重试。');
+      document.getElementById('score').textContent = data.similarity.toFixed(1);
+      document.getElementById('percent').textContent = '%';
+      document.getElementById('meter-fill').style.width = `${data.similarity}%`;
+      document.getElementById('verdict').textContent = data.same_person ? '可能是同一人' : '可能不是同一人';
+      document.getElementById('cosine').textContent = `余弦值 ${data.cosine.toFixed(4)} / 阈值 ${data.threshold}`;
+      const multiA = data.image_a.face_count > 1 ? `（A 检测到 ${data.image_a.face_count} 张，已选最大人脸）` : '';
+      const multiB = data.image_b.face_count > 1 ? `（B 检测到 ${data.image_b.face_count} 张，已选最大人脸）` : '';
+      document.getElementById('detection').textContent = `A、B 均已检测到人脸。${multiA}${multiB}`;
+      setMessage(data.note);
+    } catch (error) {
+      clearResult();
+      document.getElementById('verdict').textContent = '未能完成对比';
+      setMessage(error.message || '网络连接失败，请确认本地服务仍在运行。', true);
+    } finally {
+      busy = false;
+      updateControls();
+    }
+  });
+
+  resetButton.addEventListener('click', () => {
+    if (busy) return;
+    reset('a'); reset('b');
+    clearResult(); setMessage(''); updateControls();
+  });
+})();
+</script>
+</body>
+</html>
