@@ -9,7 +9,7 @@
 
 # GPT-6.1-sol 与 Kimi-3.1-pro：代码与 UI 审查
 
-审查日期：2026-10-24。归属由用户确认：原仓库为 GPT，附件为 Kimi。
+审查日期：2026-10-24。归属由用户确认：原仓库为 GPT，附件为 Kimi。以下代码与 UI 审查记录以最初整理版本为基准；后续启动与下载修复见文末“更新过程”，当前状态以该节为准。
 
 ## 结论
 
@@ -63,3 +63,34 @@ Kimi 更接近完成的网页产品：视觉层级、拖放、状态提示、前
 
 完成两套 Python 语法检查、Kimi 前端 JS 语法检查、两个自解压 BAT 内嵌 ZIP 完整性和源码一致性检查。未执行 Windows BAT，未下载 ONNX 模型，未做真实人脸识别、性能或浏览器渲染测试。UI 判断来自 HTML/CSS/JS 静态审查，不冒充运行实测。
 
+
+## 更新过程（2026-10-24）
+
+以下按实际反馈与修复顺序记录。两版均发生过启动失败，不能把源码审查或局部修复当作“一键启动已验证”。
+
+| 顺序 | 用户反馈 / 发现 | 原因与处理 | 更新文件 / 提交 |
+| --- | --- | --- | --- |
+| 1 | Kimi 安装 Flask 时出现 ProxyError、WinError 10061，末尾提示找不到 Flask 版本 | pip 连接失效代理，末尾的版本提示是网络失败的后果。先在安装阶段临时清理代理配置、设置 NO_PROXY，并在清华源失败后尝试官方 PyPI；此时尚未覆盖模型下载阶段。 | Kimi 启动脚本；早期代理修复随 [两版整理](https://github.com/feeday/face-bat/commit/d65345c) 一起入库，原始脚本另存为 start-original.bat |
+| 2 | Kimi 下载 OpenCV 源码包，进入长时间编译，最后链接 python3.lib 失败 | 启动脚本选中了 Python 3.14 自由线程版（cp314t），没有匹配的 OpenCV wheel。改为只接受普通 CPython 3.11/3.12 64 位，并使用 --only-binary=:all: 禁止源码编译；使用独立 .venv-kimi，旧 .venv 保留。 | [Kimi start.bat](kimi-3.1-pro/start.bat) · [fbc33ce](https://github.com/feeday/face-bat/commit/fbc33ce) |
+| 3 | GPT 安装 Flask 也出现 ProxyError、WinError 10061 | GPT 同样缺少失效代理处理。为 pip 增加临时代理绕过、清华源到官方源回退及仅安装 wheel 的限制。此轮同样只覆盖依赖安装。 | [GPT start.bat](gpt-6.1-sol/start.bat) · [9993fb6](https://github.com/feeday/face-bat/commit/9993fb6) |
+| 4 | Kimi 已用 Python 3.12.10 成功安装依赖，但三个模型源仍连接 127.0.0.1:7890 失败；BAT 中文提示被当成命令 | 安装结束后代理绕过作用域已退出。将绕过保留到本次启动进程结束，覆盖模型下载；BAT 命令和提示改为 ASCII 英文，规避观察到的编码问题。系统代理设置不变，内嵌程序载荷不变。 | [Kimi start.bat](kimi-3.1-pro/start.bat) · [3def890](https://github.com/feeday/face-bat/commit/3def890) |
+| 5 | GPT 模型下载也报 URLError / WinError 10061 | 该堆栈仅能确认连接被拒绝，不能单独确定是代理还是目标地址不可达。下载器改为先用空 ProxyHandler 显式直连，依次尝试 GitHub、HF 镜像、Hugging Face；全部直连失败后再按系统网络配置重试。单次连接/读取超时设为 25 秒；保留缓存、临时文件清理与最小尺寸检查。 | [GPT app.py](gpt-6.1-sol/app.py) · [61d76d1](https://github.com/feeday/face-bat/commit/61d76d1) |
+
+### 当前使用方式
+
+- **GPT**：更新同目录的 `start.bat` 和 `app.py`，双击 `start.bat`。已有 `.venv` 和有效模型缓存继续复用，无需为本次修复删除环境。模型在 `models/`。
+- **Kimi**：安装普通版 Python 3.11 或 3.12 64 位，更新 `start.bat` 后双击。修复版 BAT 自带程序载荷，使用 `.venv-kimi`，模型在 `.models/`；原 `.venv` 保留。
+- Kimi 的 `start-original.bat` 仅用于保留原始实现，不包含这些启动修复。其自解压脚本会覆盖同目录 `app.py`、`index.html`、`requirements.txt`，自行改源码时须注意。
+- 网络必须能访问至少一个模型下载源。修复代理处理不等于保证所有网络环境都能下载成功。
+
+### 验证结果与剩余限制
+
+- **用户日志已确认**：Kimi 正确选择 Python 3.12.10，并成功安装 Flask、NumPy、OpenCV、Pillow、requests 等依赖；随后在模型下载阶段失败。这证明依赖阶段修复有效，不代表整套程序已启动成功。
+- **本地检查已完成**：Python/前端 JavaScript 语法；Kimi BAT 内嵌 ZIP 完整性及源码一致性；ASCII 启动命令与代理设置作用域检查。
+- **GPT 下载器已做模拟测试**：首个源连接被拒绝后切换备用源、复用已有模型、清理临时文件。模拟测试没有下载真实 ONNX 模型。
+- **尚未确认**：最后一轮修复后两版在用户 Windows 上完整启动、真实模型下载与识别结果。未做两版准确率、速度或浏览器渲染的统一实测。
+- 此次修复集中于环境、代理和下载流程，没有合并两版 UI 或修改人脸匹配算法。GPT 模型仍按最小尺寸检查，未增加 SHA-256 校验；Kimi 原有 UI 并发和百分比分数表达等问题仍属于后续改进项。
+
+### 对先前结论的修正
+
+先前根据 Python 版本限制与自动端口设计判断“GPT 一键启动更可靠”，表述过早。实际反馈表明两版都未完整处理失效代理和模型下载。较准确的结论是：GPT 初始版在 Python 版本选择上更谨慎，Kimi 初始版界面交互更完整；两者的完整交付可靠性都必须通过真实启动验证。
